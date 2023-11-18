@@ -11,90 +11,114 @@
  */
 import com.jcraft.jsch.*;
 import java.awt.*;
+import java.io.IOException;
+import java.io.InputStream;
+
 import javax.swing.*;
 
 public class main {
-	
+
 	private static final int PORT_NUMER = 2222;
-	
+	private static final String DEFAULT_USER = "test";
+
 	public static void main(String[] arg) {
 
 		try {
-			JSch jsch = new JSch();
 
-			// jsch.setKnownHosts("/home/foo/.ssh/known_hosts");
+			Session session = startConnection();
 
-			String host = null;
-			if (arg.length > 0) {
-				host = arg[0];
-			} else {
-				host = JOptionPane.showInputDialog("Enter username@hostname",
-						System.getProperty("user.name") + "@localhost");
-			}
-			String user = host.substring(0, host.indexOf('@'));
-			host = host.substring(host.indexOf('@') + 1);
+			String command1 = "pwd";
 
-			Session session = jsch.getSession(user, host, PORT_NUMER);
+			Channel channel = session.openChannel("exec");
+			((ChannelExec) channel).setCommand(command1);
+			channel.setInputStream(null);
+			((ChannelExec) channel).setErrStream(System.err);
 
-			String passwd = JOptionPane.showInputDialog("Enter password");
-			session.setPassword(passwd);
+			// leer los datos que vienen de la consola
+			InputStream inServerResponse = channel.getInputStream();
+			channel.connect();
 
-			UserInfo ui = new MyUserInfo() {
-				public void showMessage(String message) {
-					JOptionPane.showMessageDialog(null, message);
-				}
+			printServerResponse(inServerResponse, channel);
 
-				public boolean promptYesNo(String message) {
-					Object[] options = { "yes", "no" };
-					int foo = JOptionPane.showOptionDialog(null, message, "Warning", JOptionPane.DEFAULT_OPTION,
-							JOptionPane.WARNING_MESSAGE, null, options, options[0]);
-					return foo == 0;
-				}
+			channel.disconnect();
+			session.disconnect();
+			System.out.println("DONE");
 
-				// If password is not given before the invocation of Session#connect(),
-				// implement also following methods,
-				// * UserInfo#getPassword(),
-				// * UserInfo#promptPassword(String message) and
-				// * UIKeyboardInteractive#promptKeyboardInteractive()
-
-			};
-
-			session.setUserInfo(ui);
-
-			// It must not be recommended, but if you want to skip host-key check,
-			// invoke following,
-			// session.setConfig("StrictHostKeyChecking", "no");
-
-			// session.connect();
-			session.connect(30000); // making a connection with timeout.
-
-			Channel channel = session.openChannel("shell");
-
-			// Enable agent-forwarding.
-			// ((ChannelShell)channel).setAgentForwarding(true);
-
-			channel.setInputStream(System.in);
-			/*
-			 * // a hack for MS-DOS prompt on Windows. channel.setInputStream(new
-			 * FilterInputStream(System.in){ public int read(byte[] b, int off, int
-			 * len)throws IOException{ return in.read(b, off, (len>1024?1024:len)); } });
-			 */
-
-			channel.setOutputStream(System.out);
-
-			/*
-			 * // Choose the pty-type "vt102". ((ChannelShell)channel).setPtyType("vt102");
-			 */
-
-			/*
-			 * // Set environment variable "LANG" as "ja_JP.eucJP".
-			 * ((ChannelShell)channel).setEnv("LANG", "ja_JP.eucJP");
-			 */
-
-			// channel.connect();
-			channel.connect(3 * 1000);
 		} catch (Exception e) {
 			System.out.println(e);
+		}
+	}
+
+	/**
+	 * Inicia la conexion al servidor ssh
+	 * con username, password
+	 * @return
+	 * @throws JSchException
+	 */
+	private static Session startConnection() throws JSchException {
+		JSch jsch = new JSch();
+
+		// jsch.setKnownHosts("/home/foo/.ssh/known_hosts");
+
+		String host = JOptionPane.showInputDialog("Enter username@hostname",
+				DEFAULT_USER + "@localhost");
+		String user = host.substring(0, host.indexOf('@'));
+		host = host.substring(host.indexOf('@') + 1);
+
+		Session session = jsch.getSession(user, host, PORT_NUMER);
+
+		String passwd = JOptionPane.showInputDialog("Enter password");
+		session.setPassword(passwd);
+
+		UserInfo ui = new MyUserInfo() {
+			public void showMessage(String message) {
+				JOptionPane.showMessageDialog(null, message);
+			}
+
+			public boolean promptYesNo(String message) {
+				Object[] options = { "yes", "no" };
+				int foo = JOptionPane.showOptionDialog(null, message, "Warning", JOptionPane.DEFAULT_OPTION,
+						JOptionPane.WARNING_MESSAGE, null, options, options[0]);
+				return foo == 0;
+			}
+
+			// If password is not given before the invocation of Session#connect(),
+			// implement also following methods,
+			// * UserInfo#getPassword(),
+			// * UserInfo#promptPassword(String message) and
+			// * UIKeyboardInteractive#promptKeyboardInteractive()
+
+		};
+
+		session.setUserInfo(ui);
+
+		// It must not be recommended, but if you want to skip host-key check,
+		// invoke following,
+		// session.setConfig("StrictHostKeyChecking", "no");
+
+		// session.connect();
+		session.connect(30000); // making a connection with timeout.
+
+		return session;
+	}
+
+	private static void printServerResponse(InputStream inServerResponse, Channel channel) throws IOException {
+		byte[] tmp = new byte[1024];
+		while (true) {
+			while (inServerResponse.available() > 0) {
+				int i = inServerResponse.read(tmp, 0, 1024);
+				if (i < 0)
+					break;
+				System.out.print(new String(tmp, 0, i));
+			}
+			if (channel.isClosed()) {
+				System.out.println("exit-status: " + channel.getExitStatus());
+				break;
+			}
+			try {
+				Thread.sleep(1000);
+			} catch (Exception ee) {
+			}
 		}
 	}
 
