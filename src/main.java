@@ -27,20 +27,13 @@ public class main {
 
 			Session session = startConnection();
 
+			// comando a ejecutar
 			String command1 = "pwd";
-
-			Channel channel = session.openChannel("exec");
-			((ChannelExec) channel).setCommand(command1);
-			channel.setInputStream(null);
-			((ChannelExec) channel).setErrStream(System.err);
-
-			// leer los datos que vienen de la consola
-			InputStream inServerResponse = channel.getInputStream();
-			channel.connect();
-
-			printServerResponse(inServerResponse, channel);
-
-			channel.disconnect();
+			runCommand(command1, session);
+			
+			String command2 = "ls -a";
+			runCommand(command2, session);
+			
 			session.disconnect();
 			System.out.println("DONE");
 
@@ -50,8 +43,8 @@ public class main {
 	}
 
 	/**
-	 * Inicia la conexion al servidor ssh
-	 * con username, password
+	 * Inicia la conexion al servidor ssh con username, password
+	 * 
 	 * @return
 	 * @throws JSchException
 	 */
@@ -60,8 +53,7 @@ public class main {
 
 		// jsch.setKnownHosts("/home/foo/.ssh/known_hosts");
 
-		String host = JOptionPane.showInputDialog("Enter username@hostname",
-				DEFAULT_USER + "@localhost");
+		String host = JOptionPane.showInputDialog("Enter username@hostname", DEFAULT_USER + "@localhost");
 		String user = host.substring(0, host.indexOf('@'));
 		host = host.substring(host.indexOf('@') + 1);
 
@@ -120,6 +112,22 @@ public class main {
 			} catch (Exception ee) {
 			}
 		}
+	}
+
+	private static void runCommand(String command, Session session) throws JSchException, IOException {
+		// inicio un channel de ejecucion
+		Channel channel = session.openChannel("exec");
+		((ChannelExec) channel).setCommand(command);
+		channel.setInputStream(null);
+		((ChannelExec) channel).setErrStream(System.err);
+
+		// leer los datos que vienen de la consola
+		InputStream inServerResponse = channel.getInputStream();
+		channel.connect();
+
+		printServerResponse(inServerResponse, channel);
+
+		channel.disconnect();
 	}
 
 	public static abstract class MyUserInfo implements UserInfo, UIKeyboardInteractive {
